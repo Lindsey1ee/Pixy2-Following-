@@ -1,0 +1,215 @@
+//this code is to allow for a wheelchair to follow a specified object 
+// Use pixy2 camera to calculate the area of a selected object (signature 1)
+//assign a max area (when the object is as close to the wheelchair as we want it to get)
+//when object is at max area stop the motors - otherwise run the motors
+
+#include <AccelStepper.h> //Stepper motor library
+#include <Pixy2.h> //Pixy2 Camera library
+
+
+Pixy2 pixy; 
+ 
+
+// Define the pins for the stepper motor GREY   
+//right motor
+const int stepPin_G = 6; 
+const int dirPin_G = 5; 
+const int enablePin_G = 4; 
+
+
+//Pins for stepper BLUE 
+//left motor
+const int stepPin_B = 3; 
+const int dirPin_B = 2; 
+const int enablePin_B = 1; 
+
+int motorSpeed = 1000; 
+
+
+//setup accelstepper library for both motors
+AccelStepper stepper_G(AccelStepper::DRIVER, stepPin_G, -dirPin_G); // Create a stepper object for the left motor and define the step, direction, and enable pins 
+AccelStepper stepper_B(AccelStepper::DRIVER, stepPin_B, dirPin_B); 
+
+ 
+
+void setup() { 
+
+// Sets up the serial monitor
+Serial.begin(4800); 
+Serial.print("Starting...\n"); 
+ 
+
+// sets up the pixy camera 
+pixy.init(); 
+
+ 
+// Sets up Stepper_B 
+//stepper_B.setSpeed(motorSpeed); // Set the speed of the stepper motor 
+pinMode(enablePin_B, OUTPUT); // Set the enable pin as output 
+
+digitalWrite(enablePin_B, LOW); // Enables the motor 
+ 
+stepper_B.setMaxSpeed(1000000); //limit motor speed
+
+stepper_B.setAcceleration(2000000); 
+
+//stepper_B.setSpeed(INT32_MAX); 
+stepper_B.setSpeed(motorSpeed);
+ 
+ 
+
+//---------------------------------------------------------------- 
+
+// Sets up Stepper_G 
+
+//stepper_G.setSpeed(motorSpeed); 
+
+pinMode(enablePin_G, OUTPUT); // Set the enable pin as output
+ 
+digitalWrite(enablePin_G, LOW); 
+
+stepper_G.setMaxSpeed(1000000); 
+
+stepper_G.setAcceleration(2000000); 
+
+//stepper_G.setSpeed(INT32_MAX); 
+stepper_G.setSpeed(motorSpeed);
+
+} 
+
+ 
+
+
+int lastBlockTime = 0; 
+
+ 
+ 
+
+void loop() { 
+
+// getblocks detects number of items Pixy has detected 
+int numBlocks = pixy.ccc.getBlocks(true, 1, 255);  
+
+
+// if theres at least one block 
+
+if (numBlocks) {  
+
+int trackedBlock = TrackBlock(numBlocks); 
+
+FollowBlock(trackedBlock); 
+
+lastBlockTime = millis(); 
+
+} 
+
+ 
+ 
+
+for (int i = 0; i < 100; i++) { //WHY DOES CHANGING FROM i<20 to i<100 increase motor speed??
+
+stepper_G.run(); 
+stepper_B.run(); 
+
+} 
+
+} 
+
+ 
+
+int oldSignature = 1; 
+
+
+int TrackBlock(int blockCount) { 
+
+int trackedBlock = 0; 
+
+long maxSize = 0; 
+
+Serial.print("blocks ="); 
+Serial.println(blockCount); 
+
+ 
+for (int i = 0; i < blockCount; i++) { 
+
+// i am not sure if you need this part : "(oldSignature == 0) ||" 
+
+if ((pixy.ccc.blocks[i].m_signature == oldSignature)) { 
+
+// this gets the biggest block 
+
+long newSize = pixy.ccc.blocks[i].m_height * pixy.ccc.blocks[i].m_width; 
+
+if (newSize > maxSize) { 
+
+trackedBlock = i; 
+
+maxSize = newSize; 
+
+} 
+
+} 
+
+} 
+
+oldSignature = pixy.ccc.blocks[trackedBlock].m_signature; 
+
+return trackedBlock; 
+
+} 
+
+ 
+ 
+
+int size; 
+int maxSize = 8700; //this is area of the tracked object that we want to follow at the distance we want the wheelchair to stop at
+ 
+
+void FollowBlock(int trackedBlock) { 
+
+size = pixy.ccc.blocks[trackedBlock].m_width * pixy.ccc.blocks[trackedBlock].m_height; 
+
+Serial.println(size); 
+
+
+// if size is greater than the maxsize for an object 
+
+// then tell the stepper motors to stop 
+
+if (size > maxSize) { 
+
+// stepper_G.stop(); 
+// stepper_B.stop(); 
+ 
+// Otherwise begin to slow down the stepper motors 
+
+} else { 
+
+int forwardSpeed = map(size, 0, maxSize, motorSpeed, 0); 
+
+
+//stepper_G.setMaxSpeed(forwardSpeed); // this is for dynamic speed 
+//stepper_B.setMaxSpeed(forwardSpeed); 
+//stepper_G.setMaxSpeed(500); // this is for dynamic speed 
+//stepper_B.setMaxSpeed(500); 
+
+stepper_G.setSpeed(forwardSpeed); 
+stepper_B.setSpeed(forwardSpeed); 
+
+
+//stepper_G.setAcceleration(INT32_MAX); 
+// stepper_B.setAcceleration(INT32_MAX); 
+
+
+stepper_G.move(200); 
+stepper_B.move(200); 
+
+ 
+ 
+
+} 
+
+} 
+
+ 
+ 
